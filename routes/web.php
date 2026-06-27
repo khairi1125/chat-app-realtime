@@ -28,6 +28,8 @@ Route::middleware(['auth'])->group(function () {
     // Update status online/offline
     Route::post('/user/status', [ChatController::class, 'updateStatus'])->name('user.status');
 
+    Route::post('/chat/{conversation}/typing', [ChatController::class, 'typing'])->name('chat.typing');
+
 });
 
 require __DIR__.'/auth.php';

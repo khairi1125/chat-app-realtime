@@ -196,6 +196,17 @@
 
             {{-- Input Pesan --}}
             <div class="px-4 py-3 border-t border-gray-200 bg-white">
+                {{-- Typing Indicator --}}
+<div id="typingIndicator" class="hidden px-5 pb-1">
+                    <div class="flex items-center gap-2">
+                        <div class="flex gap-1 bg-white border border-gray-200 rounded-full px-3 py-2 shadow-sm">
+                            <span class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0ms"></span>
+                            <span class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 150ms"></span>
+                            <span class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 300ms"></span>
+                        </div>
+                        <span id="typingText" class="text-xs text-gray-400"></span>
+                    </div>
+                </div>
                 <div class="flex items-center gap-3 bg-gray-100 rounded-full px-4 py-2">
                     <input type="text" id="messageInput" placeholder="Tulis pesan..."
                         class="flex-1 bg-transparent text-sm outline-none text-gray-800 placeholder-gray-400">
@@ -360,14 +371,86 @@
         .joining(user => console.log(user.name, 'bergabung'))
         .leaving(user => console.log(user.name, 'keluar'))
         .listen('.message.sent', e => {
-    console.log('Pesan masuk:', e);
-    // Data bisa di e.message atau langsung di e
-    const msg = e.message ?? e;
-    if (msg.sender.id !== currentUserId) {
-        appendMessage(msg, false);
-    }
-});
+            console.log('Pesan masuk:', e);
+            const msg = e.message ?? e;
+            if (msg.sender.id !== currentUserId) {
+                appendMessage(msg, false);
+            }
+        })
+        // Tambahkan ini ↓
+        .listen('.user.typing', e => {
+            if (e.user_id !== currentUserId) {
+                const indicator = document.getElementById('typingIndicator');
+                const typingText = document.getElementById('typingText');
+                if (e.is_typing) {
+                    typingText.textContent = `${e.user_name} sedang mengetik...`;
+                    indicator.classList.remove('hidden');
+                    container.scrollTop = container.scrollHeight;
+                } else {
+                    indicator.classList.add('hidden');
+                }
+            }
+        });
 }
+
+// Typing detection di input
+let typingTimeout;
+let isCurrentlyTyping = false;
+
+function sendTypingStatus(status) {
+    fetch(`/chat/${conversationId}/typing`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+        },
+        body: JSON.stringify({ is_typing: status }),
+    });
+}
+
+input?.addEventListener('input', () => {
+    // Hanya kirim request kalau status berubah dari false ke true
+    if (!isCurrentlyTyping) {
+        isCurrentlyTyping = true;
+        sendTypingStatus(true);
+    }
+
+    // Reset timer setiap kali ngetik
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => {
+        isCurrentlyTyping = false;
+        sendTypingStatus(false);
+    }, 1500);
+});
+
+// Langsung stop typing saat pesan dikirim
+function sendMessage() {
+    const body = input?.value.trim();
+    if (!body || !conversationId) return;
+
+    // Stop typing indicator dulu
+    clearTimeout(typingTimeout);
+    if (isCurrentlyTyping) {
+        isCurrentlyTyping = false;
+        sendTypingStatus(false);
+    }
+
+    fetch(`/chat/${conversationId}/messages`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+        },
+        body: JSON.stringify({ body }),
+    })
+    .then(res => res.json())
+    .then(data => {
+        const msg = data.message ?? data;
+        appendMessage(msg, true);
+        input.value = '';
+    });
+}
+
 
     initEcho();
 </script>

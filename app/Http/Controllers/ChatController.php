@@ -108,4 +108,21 @@ class ChatController extends Controller
 
         return response()->json(['success' => true]);
     }
+
+    // Handle user typing event
+    public function typing(Request $request, Conversation $conversation)
+{
+    $request->validate([
+        'is_typing' => 'required|boolean',
+    ]);
+
+    broadcast(new \App\Events\UserTyping(
+        conversationId: $conversation->id,
+        userId: Auth::id(),
+        userName: Auth::user()->name,
+        isTyping: $request->is_typing,
+    ))->toOthers();
+
+    return response()->json(['success' => true]);
+}
 }
