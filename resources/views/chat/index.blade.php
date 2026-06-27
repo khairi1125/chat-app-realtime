@@ -349,18 +349,28 @@
 
 @if(isset($conversation))
 <script>
-    // Terima pesan real-time via Reverb
+    function initEcho() {
+    if (typeof window.Echo === 'undefined') {
+        setTimeout(initEcho, 500);
+        return;
+    }
+
     window.Echo.join(`conversation.{{ $conversation->id }}`)
         .here(users => console.log('Online:', users))
         .joining(user => console.log(user.name, 'bergabung'))
         .leaving(user => console.log(user.name, 'keluar'))
         .listen('.message.sent', e => {
-            if (e.message.sender.id !== currentUserId) {
-                appendMessage(e.message, false);
-            }
-        });
+    console.log('Pesan masuk:', e);
+    // Data bisa di e.message atau langsung di e
+    const msg = e.message ?? e;
+    if (msg.sender.id !== currentUserId) {
+        appendMessage(msg, false);
+    }
+});
+}
+
+    initEcho();
 </script>
 @endif
-
 </body>
 </html>
