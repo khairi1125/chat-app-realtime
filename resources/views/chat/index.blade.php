@@ -67,43 +67,46 @@
                     $latestMsg = $conv->latestMessage;
                 @endphp
                 <a href="{{ route('chat.show', $conv) }}"
-                    class="flex items-center gap-3 px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition
-                    {{ $isActive ? 'bg-blue-50' : '' }}">
-                    {{-- Avatar --}}
-                    <div class="relative flex-shrink-0">
-                        <div class="w-11 h-11 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold text-sm">
-                            {{ $initials }}
-                        </div>
-                        @if($conv->type === 'private' && $other?->status === 'online')
-                            <span class="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></span>
-                        @else
-                            <span class="absolute bottom-0 right-0 w-3 h-3 bg-gray-400 rounded-full border-2 border-white"></span>
-                        @endif
-                    </div>
-                    {{-- Info --}}
-                    <div class="flex-1 min-w-0">
-                        <div class="flex items-center gap-2">
-                            <span class="font-medium text-sm text-gray-800 truncate">{{ $displayName }}</span>
-                            @if($conv->type === 'group')
-                                <span class="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">Grup</span>
-                            @endif
-                        </div>
-                        <p class="text-xs text-gray-500 truncate mt-0.5">
-                            @if($latestMsg)
-                                @if($latestMsg->user_id === auth()->id()) Kamu: @endif
-                                {{ $latestMsg->body }}
-                            @else
-                                Belum ada pesan
-                            @endif
-                        </p>
-                    </div>
-                    {{-- Waktu --}}
-                    @if($latestMsg)
-                        <span class="text-xs text-gray-400 flex-shrink-0">
-                            {{ $latestMsg->created_at->format('H:i') }}
-                        </span>
-                    @endif
-                </a>
+    class="contact-item-link flex items-center gap-3 px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition
+    {{ $isActive ? 'bg-blue-50' : '' }}">
+    
+    {{-- Avatar --}}
+    <div class="relative flex-shrink-0">
+        <div class="w-11 h-11 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold text-sm">
+            {{ $initials }}
+        </div>
+        @if($conv->type === 'private' && $other?->status === 'online')
+            <span class="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></span>
+        @else
+            <span class="absolute bottom-0 right-0 w-3 h-3 bg-gray-400 rounded-full border-2 border-white"></span>
+        @endif
+    </div>
+
+    {{-- Info --}}
+    <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2">
+            <span class="font-medium text-sm text-gray-800 truncate">{{ $displayName }}</span>
+            @if($conv->type === 'group')
+                <span class="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">Grup</span>
+            @endif
+        </div>
+        <p class="preview-text text-xs text-gray-500 truncate mt-0.5">
+            @if($latestMsg)
+                @if($latestMsg->user_id === auth()->id()) Kamu: @endif
+                {{ $latestMsg->body }}
+            @else
+                Belum ada pesan
+            @endif
+        </p>
+    </div>
+
+    {{-- Waktu --}}
+    @if($latestMsg)
+        <span class="preview-time text-xs text-gray-400 flex-shrink-0">
+            {{ $latestMsg->created_at->format('H:i') }}
+        </span>
+    @endif
+</a>
             @empty
                 <div class="flex flex-col items-center justify-center h-full text-gray-400 p-8">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12 mb-3 opacity-30" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -325,25 +328,53 @@
 
     // Append pesan baru ke UI
     function appendMessage(msg, isMe) {
-        if (!container) return;
-        const div = document.createElement('div');
-        div.className = `flex ${isMe ? 'justify-end' : 'justify-start'} gap-2`;
-        div.innerHTML = `
-            ${!isMe ? `<div class="w-7 h-7 rounded-full bg-gray-400 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0 self-end">
-                ${msg.sender.name.charAt(0).toUpperCase()}
-            </div>` : ''}
-            <div class="max-w-xs lg:max-w-md">
-                <div class="${isMe ? 'bg-blue-500 text-white rounded-tl-2xl' : 'bg-white text-gray-800 rounded-tr-2xl border border-gray-200'} rounded-b-2xl px-4 py-2.5 shadow-sm">
-                    <p class="text-sm leading-relaxed">${msg.body}</p>
-                    <p class="text-xs mt-1 ${isMe ? 'text-blue-100 text-right' : 'text-gray-400 text-right'}">
-                        ${new Date(msg.created_at).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'})}
-                        ${isMe ? '✓✓' : ''}
-                    </p>
-                </div>
-            </div>`;
-        container.appendChild(div);
-        container.scrollTop = container.scrollHeight;
-    }
+    if (!container) return;
+    const div = document.createElement('div');
+    div.className = `flex ${isMe ? 'justify-end' : 'justify-start'} gap-2`;
+    div.innerHTML = `
+        ${!isMe ? `<div class="w-7 h-7 rounded-full bg-gray-400 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0 self-end">
+            ${msg.sender.name.charAt(0).toUpperCase()}
+        </div>` : ''}
+        <div class="max-w-xs lg:max-w-md">
+            <div class="${isMe ? 'bg-blue-500 text-white rounded-tl-2xl' : 'bg-white text-gray-800 rounded-tr-2xl border border-gray-200'} rounded-b-2xl px-4 py-2.5 shadow-sm">
+                <p class="text-sm leading-relaxed">${msg.body}</p>
+                <p class="text-xs mt-1 ${isMe ? 'text-blue-100 text-right' : 'text-gray-400 text-right'}">
+                    ${new Date(msg.created_at).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'})}
+                    ${isMe ? '✓✓' : ''}
+                </p>
+            </div>
+        </div>`;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+
+    // ← Tambahkan ini: update preview pesan di sidebar
+    updateSidebarPreview(msg, isMe);
+}
+
+function updateSidebarPreview(msg, isMe) {
+    // Cari semua link conversation di sidebar
+    const links = document.querySelectorAll('.contact-item-link');
+    links.forEach(link => {
+        const href = link.getAttribute('href');
+        if (href && href.includes(`/chat/${conversationId}`)) {
+            // Update preview text
+            const preview = link.querySelector('.preview-text');
+            if (preview) {
+                preview.textContent = isMe ? `Kamu: ${msg.body}` : msg.body;
+            }
+            // Update waktu
+            const time = link.querySelector('.preview-time');
+            if (time) {
+                const now = new Date(msg.created_at);
+                time.textContent = now.toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
+            }
+            // Pindahkan conversation ke paling atas sidebar
+            const list = link.parentElement;
+            const parent = list.parentElement;
+            parent.prepend(list);
+        }
+    });
+}
 
     // Update status online saat halaman dibuka
     fetch('/user/status', {
@@ -453,6 +484,24 @@ function sendMessage() {
 
 
     initEcho();
+
+    // Listen conversation baru
+if (typeof window.Echo !== 'undefined') {
+    window.Echo.private(`user.${currentUserId}`)
+        .listen('.conversation.created', e => {
+            console.log('Conversation baru:', e);
+            // Reload sidebar otomatis
+            window.location.reload();
+        });
+} else {
+    setTimeout(() => {
+        window.Echo.private(`user.${currentUserId}`)
+            .listen('.conversation.created', e => {
+                window.location.reload();
+            });
+    }, 1000);
+}
+
 </script>
 @endif
 </body>
