@@ -28,7 +28,7 @@
     {{ isset($conversation) ? 'hidden md:flex' : 'flex' }}">
 
         {{-- Header Sidebar --}}
-        <div class="p-4 border-b border-gray-200">
+        <div class="p-4 border-b border-gray-200 flex-shrink-0">
             <div class="flex items-center justify-between mb-3">
                 <h1 class="text-lg font-semibold text-gray-800">Chats</h1>
                 <div class="flex gap-1">
@@ -64,7 +64,7 @@
         </div>
 
         {{-- List Conversations --}}
-        <div class="overflow-y-auto" style="height: calc(100dvh - 140px);">
+        <div class="flex-1 overflow-y-auto min-h-0">
             @forelse($conversations as $conv)
                 @php
                     $other = $conv->type === 'private'
@@ -309,14 +309,31 @@
     const sendBtn = document.getElementById('sendBtn');
 
     function sendMessage() {
-        const body = input?.value.trim();
-        if (!body || !conversationId) return;
+    const body = input?.value.trim();
+    if (!body || !conversationId) return;
 
-        clearTimeout(typingTimeout);
-        if (isCurrentlyTyping) {
-            isCurrentlyTyping = false;
-            sendTypingStatus(false);
-        }
+    clearTimeout(typingTimeout);
+    if (isCurrentlyTyping) {
+        isCurrentlyTyping = false;
+        sendTypingStatus(false);
+    }
+
+    fetch(`/chat/${conversationId}/messages`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+        },
+        body: JSON.stringify({ body }),
+    })
+    .then(res => res.json())
+    .then(data => {
+        const msg = data.message ?? data;
+        appendMessage(msg, true);
+        document.getElementById('messageInput').value = '';
+        console.log('Input cleared:', document.getElementById('messageInput').value); // ← tambah ini
+    });
+}
 
         fetch(`/chat/${conversationId}/messages`, {
             method: 'POST',
@@ -328,11 +345,11 @@
         })
         .then(res => res.json())
         .then(data => {
-            const msg = data.message ?? data;
-            appendMessage(msg, true);
-            input.value = '';
-        });
-    }
+    const msg = data.message ?? data;
+    appendMessage(msg, true);
+    document.getElementById('messageInput').value = '';
+});
+    
 
     input?.addEventListener('keydown', e => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -366,20 +383,20 @@
     }
 
     function updateSidebarPreview(msg, isMe) {
-        const links = document.querySelectorAll('.contact-item-link');
-        links.forEach(link => {
-            const href = link.getAttribute('href');
-            if (href && href.includes(`/chat/${conversationId}`)) {
-                const preview = link.querySelector('.preview-text');
-                if (preview) preview.textContent = isMe ? `Kamu: ${msg.body}` : msg.body;
-                const time = link.querySelector('.preview-time');
-                if (time) time.textContent = new Date(msg.created_at).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
-                const list = link.parentElement;
-                const parent = list.parentElement;
-                parent.prepend(list);
-            }
-        });
-    }
+    const links = document.querySelectorAll('.contact-item-link');
+    links.forEach(link => {
+        const href = link.getAttribute('href');
+        if (href && href.includes(`/chat/${conversationId}`)) {
+            const preview = link.querySelector('.preview-text');
+            if (preview) preview.textContent = isMe ? `Kamu: ${msg.body}` : msg.body;
+            const time = link.querySelector('.preview-time');
+            if (time) time.textContent = new Date(msg.created_at).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
+        }
+    });
+    
+    // Clear input setelah update sidebar
+    document.getElementById('messageInput').value = '';
+}
 
     let typingTimeout;
     let isCurrentlyTyping = false;
