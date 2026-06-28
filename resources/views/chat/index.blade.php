@@ -64,7 +64,7 @@
         </div>
 
         {{-- List Conversations --}}
-        <div class="flex-1 overflow-y-auto min-h-0">
+        <div class="flex-1 overflow-y-auto min-h-0" id="contactList">
             @forelse($conversations as $conv)
                 @php
                     $other = $conv->type === 'private'
@@ -104,11 +104,18 @@
                             @endif
                         </p>
                     </div>
-                    @if($latestMsg)
-                        <span class="preview-time text-xs text-gray-400 flex-shrink-0">
-                            {{ $latestMsg->created_at->format('H:i') }}
-                        </span>
-                    @endif
+                    <div class="flex flex-col items-end gap-1 flex-shrink-0">
+    @if($latestMsg)
+        <span class="preview-time text-xs text-gray-400">
+            {{ $latestMsg->created_at->format('H:i') }}
+        </span>
+    @endif
+    @if($conv->unread_count > 0)
+        <span class="unread-badge bg-blue-500 text-white text-xs font-semibold rounded-full w-5 h-5 flex items-center justify-center">
+            {{ $conv->unread_count > 99 ? '99+' : $conv->unread_count }}
+        </span>
+    @endif
+</div>
                 </a>
             @empty
                 <div class="flex flex-col items-center justify-center h-full text-gray-400 p-8">
@@ -309,31 +316,14 @@
     const sendBtn = document.getElementById('sendBtn');
 
     function sendMessage() {
-    const body = input?.value.trim();
-    if (!body || !conversationId) return;
+        const body = input?.value.trim();
+        if (!body || !conversationId) return;
 
-    clearTimeout(typingTimeout);
-    if (isCurrentlyTyping) {
-        isCurrentlyTyping = false;
-        sendTypingStatus(false);
-    }
-
-    fetch(`/chat/${conversationId}/messages`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': csrfToken,
-        },
-        body: JSON.stringify({ body }),
-    })
-    .then(res => res.json())
-    .then(data => {
-        const msg = data.message ?? data;
-        appendMessage(msg, true);
-        document.getElementById('messageInput').value = '';
-        console.log('Input cleared:', document.getElementById('messageInput').value); // ← tambah ini
-    });
-}
+        clearTimeout(typingTimeout);
+        if (isCurrentlyTyping) {
+            isCurrentlyTyping = false;
+            sendTypingStatus(false);
+        }
 
         fetch(`/chat/${conversationId}/messages`, {
             method: 'POST',
@@ -345,11 +335,11 @@
         })
         .then(res => res.json())
         .then(data => {
-    const msg = data.message ?? data;
-    appendMessage(msg, true);
-    document.getElementById('messageInput').value = '';
-});
-    
+            const msg = data.message ?? data;
+            appendMessage(msg, true);
+            input.value = '';
+        });
+    }
 
     input?.addEventListener('keydown', e => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -379,24 +369,26 @@
             </div>`;
         container.appendChild(div);
         container.scrollTop = container.scrollHeight;
+
+        // Update preview sidebar untuk conversation yang sedang dibuka
         updateSidebarPreview(msg, isMe);
     }
 
     function updateSidebarPreview(msg, isMe) {
-    const links = document.querySelectorAll('.contact-item-link');
-    links.forEach(link => {
-        const href = link.getAttribute('href');
-        if (href && href.includes(`/chat/${conversationId}`)) {
-            const preview = link.querySelector('.preview-text');
-            if (preview) preview.textContent = isMe ? `Kamu: ${msg.body}` : msg.body;
-            const time = link.querySelector('.preview-time');
-            if (time) time.textContent = new Date(msg.created_at).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
-        }
-    });
-    
-    // Clear input setelah update sidebar
-    document.getElementById('messageInput').value = '';
-}
+        const links = document.querySelectorAll('.contact-item-link');
+        links.forEach(link => {
+            const href = link.getAttribute('href');
+            if (href && href.includes(`/chat/${conversationId}`)) {
+                const preview = link.querySelector('.preview-text');
+                if (preview) preview.textContent = isMe ? `Kamu: ${msg.body}` : msg.body;
+                const time = link.querySelector('.preview-time');
+                if (time) time.textContent = new Date(msg.created_at).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
+                // Hapus badge karena sedang dibuka
+                const badge = link.querySelector('.unread-badge');
+                if (badge) badge.remove();
+            }
+        });
+    }
 
     let typingTimeout;
     let isCurrentlyTyping = false;
@@ -432,15 +424,48 @@
         navigator.sendBeacon('/user/status', JSON.stringify({ status: 'offline' }));
     });
 
-    // Listen conversation baru
     function initUserChannel() {
         if (typeof window.Echo === 'undefined') {
             setTimeout(initUserChannel, 500);
             return;
         }
+
         window.Echo.private(`user.${currentUserId}`)
             .listen('.conversation.created', e => {
                 window.location.reload();
+            })
+            .listen('.message.received', e => {
+                // Hanya proses kalau bukan conversation yang sedang dibuka
+                if (e.conversation_id !== conversationId) {
+                    const links = document.querySelectorAll('.contact-item-link');
+                    links.forEach(link => {
+                        const href = link.getAttribute('href');
+                        if (href && href.includes(`/chat/${e.conversation_id}`)) {
+                            // Update badge
+                            const badge = link.querySelector('.unread-badge');
+                            const meta = link.querySelector('.flex.flex-col.items-end');
+                            if (badge) {
+                                const count = parseInt(badge.textContent) + 1;
+                                badge.textContent = count > 99 ? '99+' : count;
+                            } else if (meta) {
+                                const newBadge = document.createElement('span');
+                                newBadge.className = 'unread-badge bg-blue-500 text-white text-xs font-semibold rounded-full w-5 h-5 flex items-center justify-center';
+                                newBadge.textContent = '1';
+                                meta.appendChild(newBadge);
+                            }
+                            // Update preview text
+                            const preview = link.querySelector('.preview-text');
+                            if (preview) preview.textContent = e.body;
+                            const time = link.querySelector('.preview-time');
+                            if (time) time.textContent = new Date(e.created_at).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
+                            // Pindahkan ke atas
+                            const contactList = document.getElementById('contactList');
+                            if (contactList && link.parentElement && contactList !== link.parentElement) {
+                                contactList.prepend(link.parentElement);
+                            }
+                        }
+                    });
+                }
             });
     }
     initUserChannel();
@@ -459,11 +484,11 @@
             .joining(user => console.log(user.name, 'bergabung'))
             .leaving(user => console.log(user.name, 'keluar'))
             .listen('.message.sent', e => {
-                const msg = e.message ?? e;
-                if (msg.sender.id !== currentUserId) {
-                    appendMessage(msg, false);
-                }
-            })
+    const msg = e.message ?? e;
+    if (msg.sender.id !== currentUserId) {
+        appendMessage(msg, false);
+    }
+})
             .listen('.user.typing', e => {
                 if (e.user_id !== currentUserId) {
                     const indicator = document.getElementById('typingIndicator');
