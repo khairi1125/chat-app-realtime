@@ -76,6 +76,7 @@
                     $latestMsg = $conv->latestMessage;
                 @endphp
                 <a href="{{ route('chat.show', $conv) }}"
+                    data-user-id="{{ $conv->type === 'private' ? ($other?->id ?? '') : '' }}"
                     class="contact-item-link flex items-center gap-3 px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition
                     {{ $isActive ? 'bg-blue-50' : '' }}">
                     <div class="relative flex-shrink-0">
@@ -83,10 +84,10 @@
                             {{ $initials }}
                         </div>
                         @if($conv->type === 'private' && $other?->status === 'online')
-                            <span class="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></span>
-                        @else
-                            <span class="absolute bottom-0 right-0 w-3 h-3 bg-gray-400 rounded-full border-2 border-white"></span>
-                        @endif
+    <span class="status-dot absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></span>
+@else
+    <span class="status-dot absolute bottom-0 right-0 w-3 h-3 bg-gray-400 rounded-full border-2 border-white"></span>
+@endif
                     </div>
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-2">
@@ -155,34 +156,37 @@
             @endphp
 
             {{-- Chat Header --}}
-            <div class="px-4 py-3 border-b border-gray-200 flex items-center gap-3 bg-white">
-                {{-- Tombol Back (mobile only) --}}
-                <a href="{{ route('chat.index') }}" class="md:hidden flex items-center justify-center w-8 h-8 rounded-lg hover:bg-gray-100 text-gray-500 flex-shrink-0">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
-                    </svg>
-                </a>
-                <div class="relative">
-                    <div class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold text-sm">
-                        {{ strtoupper(substr($chatName, 0, 1)) }}
-                    </div>
-                    @if($conversation->type === 'private' && $other?->status === 'online')
-                        <span class="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></span>
-                    @endif
-                </div>
-                <div class="flex-1">
-                    <p class="font-semibold text-gray-800 text-sm">{{ $chatName }}</p>
-                    @if($conversation->type === 'group')
-                        <p class="text-xs text-gray-500 truncate">
-                            {{ $conversation->users->pluck('name')->join(', ') }}
-                        </p>
-                    @else
-                        <p class="text-xs {{ $other?->status === 'online' ? 'text-green-500' : 'text-gray-400' }}">
-                            {{ $other?->status === 'online' ? 'Online' : 'Offline' }}
-                        </p>
-                    @endif
-                </div>
-            </div>
+<div class="px-4 py-3 border-b border-gray-200 flex items-center gap-3 bg-white">
+    <a href="{{ route('chat.index') }}" class="md:hidden flex items-center justify-center w-8 h-8 rounded-lg hover:bg-gray-100 text-gray-500 flex-shrink-0">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+        </svg>
+    </a>
+    <div class="relative">
+        <div class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold text-sm">
+            {{ strtoupper(substr($chatName, 0, 1)) }}
+        </div>
+        @if($conversation->type === 'private' && $other?->status === 'online')
+            <span id="chatHeaderDot" class="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></span>
+        @else
+            <span id="chatHeaderDot" class="hidden"></span>
+        @endif
+    </div>
+    <div class="flex-1">
+        <p class="font-semibold text-gray-800 text-sm">{{ $chatName }}</p>
+        @if($conversation->type === 'group')
+            <p class="text-xs text-gray-500 truncate">
+                {{ $conversation->users->pluck('name')->join(', ') }}
+            </p>
+        @else
+            <p id="chatHeaderStatus"
+                data-user-id="{{ $other?->id }}"
+                class="text-xs {{ $other?->status === 'online' ? 'text-green-500' : 'text-gray-400' }}">
+                {{ $other?->status === 'online' ? 'Online' : 'Offline' }}
+            </p>
+        @endif
+    </div>
+</div>
 
             {{-- Messages --}}
             <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-3 min-h-0" id="messageContainer">
@@ -414,61 +418,118 @@
         }, 1500);
     });
 
+    
+// Update online saat halaman load
+window.addEventListener('load', () => {
     fetch('/user/status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
         body: JSON.stringify({ status: 'online' }),
     });
+});
+
+// Kirim online setiap 10 detik supaya tidak kedetect offline
+setInterval(() => {
+    fetch('/user/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
+        body: JSON.stringify({ status: 'online' }),
+    });
+}, 3000); // 5 detik
+    
 
     window.addEventListener('beforeunload', () => {
-        navigator.sendBeacon('/user/status', JSON.stringify({ status: 'offline' }));
-    });
+    const blob = new Blob([JSON.stringify({ status: 'offline', _token: csrfToken })], { type: 'application/json' });
+    navigator.sendBeacon('/user/status', blob);
+});
+
+// Update online saat halaman aktif
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        fetch('/user/status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
+            body: JSON.stringify({ status: 'online' }),
+        });
+    } else {
+        fetch('/user/status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
+            body: JSON.stringify({ status: 'offline' }),
+        });
+    }
+});
 
     function initUserChannel() {
-        if (typeof window.Echo === 'undefined') {
-            setTimeout(initUserChannel, 500);
-            return;
-        }
-
-        window.Echo.private(`user.${currentUserId}`)
-            .listen('.conversation.created', e => {
-                window.location.reload();
-            })
-            .listen('.message.received', e => {
-                // Hanya proses kalau bukan conversation yang sedang dibuka
-                if (e.conversation_id !== conversationId) {
-                    const links = document.querySelectorAll('.contact-item-link');
-                    links.forEach(link => {
-                        const href = link.getAttribute('href');
-                        if (href && href.includes(`/chat/${e.conversation_id}`)) {
-                            // Update badge
-                            const badge = link.querySelector('.unread-badge');
-                            const meta = link.querySelector('.flex.flex-col.items-end');
-                            if (badge) {
-                                const count = parseInt(badge.textContent) + 1;
-                                badge.textContent = count > 99 ? '99+' : count;
-                            } else if (meta) {
-                                const newBadge = document.createElement('span');
-                                newBadge.className = 'unread-badge bg-blue-500 text-white text-xs font-semibold rounded-full w-5 h-5 flex items-center justify-center';
-                                newBadge.textContent = '1';
-                                meta.appendChild(newBadge);
-                            }
-                            // Update preview text
-                            const preview = link.querySelector('.preview-text');
-                            if (preview) preview.textContent = e.body;
-                            const time = link.querySelector('.preview-time');
-                            if (time) time.textContent = new Date(e.created_at).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
-                            // Pindahkan ke atas
-                            const contactList = document.getElementById('contactList');
-                            if (contactList && link.parentElement && contactList !== link.parentElement) {
-                                contactList.prepend(link.parentElement);
-                            }
-                        }
-                    });
-                }
-            });
+    if (typeof window.Echo === 'undefined') {
+        setTimeout(initUserChannel, 500);
+        return;
     }
-    initUserChannel();
+
+    window.Echo.private(`user.${currentUserId}`)
+        .listen('.conversation.created', e => {
+            window.location.reload();
+        })
+        .listen('.message.received', e => {
+            if (e.conversation_id !== conversationId) {
+                const links = document.querySelectorAll('.contact-item-link');
+                links.forEach(link => {
+                    const href = link.getAttribute('href');
+                    if (href && href.includes(`/chat/${e.conversation_id}`)) {
+                        const badge = link.querySelector('.unread-badge');
+                        const meta = link.querySelector('.flex.flex-col.items-end');
+                        if (badge) {
+                            const count = parseInt(badge.textContent) + 1;
+                            badge.textContent = count > 99 ? '99+' : count;
+                        } else if (meta) {
+                            const newBadge = document.createElement('span');
+                            newBadge.className = 'unread-badge bg-blue-500 text-white text-xs font-semibold rounded-full w-5 h-5 flex items-center justify-center';
+                            newBadge.textContent = '1';
+                            meta.appendChild(newBadge);
+                        }
+                        const preview = link.querySelector('.preview-text');
+                        if (preview) preview.textContent = e.body;
+                        const time = link.querySelector('.preview-time');
+                        if (time) time.textContent = new Date(e.created_at).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
+                        const contactList = document.getElementById('contactList');
+                        if (contactList && link.parentElement && contactList !== link.parentElement) {
+                            contactList.prepend(link.parentElement);
+                        }
+                    }
+                });
+            }
+        });
+
+    window.Echo.channel('user-status')
+    .listen('.user.status.changed', e => {
+        // Update dot di sidebar
+        document.querySelectorAll('[data-user-id]').forEach(link => {
+            const userId = link.getAttribute('data-user-id');
+            if (parseInt(userId) === parseInt(e.user_id)) {
+                const dot = link.querySelector('.status-dot');
+                if (dot) {
+                    dot.className = e.status === 'online'
+                        ? 'status-dot absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white'
+                        : 'status-dot absolute bottom-0 right-0 w-3 h-3 bg-gray-400 rounded-full border-2 border-white';
+                }
+            }
+        });
+
+        // ← Tambahkan ini: update status di header chat
+        const chatHeaderStatus = document.getElementById('chatHeaderStatus');
+        const chatHeaderDot = document.getElementById('chatHeaderDot');
+        if (chatHeaderStatus && parseInt(chatHeaderStatus.getAttribute('data-user-id')) === parseInt(e.user_id)) {
+            chatHeaderStatus.textContent = e.status === 'online' ? 'Online' : 'Offline';
+            chatHeaderStatus.className = e.status === 'online' ? 'text-xs text-green-500' : 'text-xs text-gray-400';
+            if (chatHeaderDot) {
+                chatHeaderDot.className = e.status === 'online'
+                    ? 'absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white'
+                    : 'hidden';
+            }
+        }
+    });
+}
+initUserChannel();
 </script>
 
 @if(isset($conversation))

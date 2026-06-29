@@ -18,7 +18,11 @@ class AppServiceProvider extends ServiceProvider
      * Bootstrap any application services.
      */
     public function boot(): void
-    {
-        //
-    }
+{
+    // Reset semua user jadi offline saat server restart
+    \App\Models\User::query()->update([
+        'status' => 'offline',
+        'last_seen_at' => now(),
+    ]);
+}
 }

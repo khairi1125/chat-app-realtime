@@ -99,7 +99,6 @@ class ChatController extends Controller
     $conversation->users
         ->where('id', '!=', Auth::id())
         ->each(function ($user) use ($message) {
-            \Log::info('Broadcasting MessageReceived to user: ' . $user->id);
             broadcast(new \App\Events\MessageReceived($message, $user));
         });
 
@@ -108,18 +107,20 @@ class ChatController extends Controller
 
     // Update status online/offline user
     public function updateStatus(Request $request)
-    {
-        $request->validate([
-            'status' => 'required|in:online,offline',
-        ]);
+{
+    $request->validate([
+        'status' => 'required|in:online,offline',
+    ]);
 
-        Auth::user()->update([
-            'status'       => $request->status,
-            'last_seen_at' => now(),
-        ]);
+    Auth::user()->update([
+        'status'       => $request->status,
+        'last_seen_at' => now(),
+    ]);
 
-        return response()->json(['success' => true]);
-    }
+    broadcast(new \App\Events\UserStatusChanged(Auth::user(), $request->status));
+
+    return response()->json(['success' => true]);
+}
 
     // Handle user typing event
     public function typing(Request $request, Conversation $conversation)
